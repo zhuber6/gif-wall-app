@@ -37,11 +37,11 @@ const TWITTER_HANDLE = '_buildspace';
 const TWITTER_LINK = `https://twitter.com/${TWITTER_HANDLE}`;
 
 // const TEST_GIFS = [
-// 	'https://media.giphy.com/media/zrvFl1IDvy0PC/giphy.gif',
-// 	'https://media.giphy.com/media/RBDXLadJCxs6A/giphy.gif',
-// 	'https://media.giphy.com/media/l0IylOPCNkiqOgMyA/giphy.gif',
-// 	'https://media.giphy.com/media/90bu0dxI23uhy/giphy.gif',
-// 	// 'https://media.giphy.com/media/xLnGUEYWS0btPHCZoo/giphy.gif'
+//  'https://media.giphy.com/media/zrvFl1IDvy0PC/giphy.gif',
+//  'https://media.giphy.com/media/RBDXLadJCxs6A/giphy.gif',
+//  'https://media.giphy.com/media/l0IylOPCNkiqOgMyA/giphy.gif',
+//  'https://media.giphy.com/media/90bu0dxI23uhy/giphy.gif',
+//  // 'https://media.giphy.com/media/xLnGUEYWS0btPHCZoo/giphy.gif'
 // ]
 
 const App = () => {
@@ -49,6 +49,7 @@ const App = () => {
   // State
   const [walletAddress, setWalletAddress] = useState(null);
   const [inputValue, setInputValue] = useState('');
+  const [tipValue, setTipValue] = useState('');
   const [gifList, setGifList] = useState([]);
 
   /*
@@ -63,19 +64,12 @@ const App = () => {
         if (solana.isPhantom) {
           console.log('Phantom wallet found!');
         
-          /*
-          * The solana object gives us a function that will allow us to connect
-          * directly with the user's wallet!
-          */
           const response = await solana.connect({ onlyIfTrusted: true });
           console.log(
             'Connected with Public Key:',
             response.publicKey.toString()
           );
 
-          /*
-          * Set the user's publicKey in state to be used later!
-          */
           setWalletAddress(response.publicKey.toString());
         }
       } else {
@@ -103,6 +97,11 @@ const App = () => {
   const onInputChange = (event) => {
     const { value } = event.target;
     setInputValue(value);
+  };
+
+  const onTipChange = (event) => {
+    const { value } = event.target;
+    setTipValue(value);
   };
 
   const getProvider = () => {
@@ -134,6 +133,41 @@ const App = () => {
     }
   }
 
+  
+  const sendSolTip = async () => {
+    if (tipValue.length > 0) {
+      console.log('Tip value:', tipValue);
+      try {
+        const connection = new Connection(network, opts.preflightCommitment);
+        const provider = getProvider();
+        // const program = new Program(idl, programID, provider);
+
+        // Add transfer instruction to transaction
+        var transaction = new web3.Transaction().add(
+          web3.SystemProgram.transfer({
+            fromPubkey: provider.wallet.publicKey,
+            toPubkey: gifList[0].userAddress,
+            lamports: web3.LAMPORTS_PER_SOL * tipValue,
+          }),
+        );
+      
+        // Sign transaction, broadcast, and confirm
+        var signature = await web3.sendAndConfirmTransaction(
+          connection,
+          transaction,
+          [provider],
+        );
+
+        console.log('SIGNATURE', signature);
+
+      } catch (error) {
+        console.log("Error sending tip:", error)
+      }
+    } else {
+      console.log('Tip has to be non-zero');
+    }
+  }
+
   const sendGif = async () => {
     if (inputValue.length > 0) {
       console.log('Gif link:', inputValue);
@@ -144,6 +178,7 @@ const App = () => {
         await program.rpc.addGif(inputValue, {
           accounts: {
             baseAccount: baseAccount.publicKey,
+            user: provider.wallet.publicKey,
           },
         });
         console.log("GIF sucesfully sent to program", inputValue)
@@ -199,9 +234,18 @@ const App = () => {
               <div className="gif-item" key={index}>
                 <img src={item.gifLink} />
                 {/* Add user wallet address below gif */}
-                {/* <p className="sub-text"> 
-                  {walletAddress}
-                </p> */}
+                <p className="wallet-addr-text"> 
+                  {item.userAddress.toString()}
+                  <input type="text"
+                  placeholder="Enter tip amount"
+                  value={tipValue}
+                  onChange={onTipChange}
+                  />
+                  <button className="cta-button give-tip-button" >
+                  {/* <button className="cta-button give-tip-button" onClick={sendSolTip}> */}
+                    TIP
+                  </button>
+                </p>
               </div>
             ))}
           </div>
@@ -244,8 +288,8 @@ const App = () => {
 
   return (
     <div className="App">
-			{/* This was solely added for some styling fanciness */}
-			<div className={walletAddress ? 'authed-container' : 'container'}>
+      {/* This was solely added for some styling fanciness */}
+      <div className={walletAddress ? 'authed-container' : 'container'}>
         <div className="header-container">
           <p className="header">Always Sunny GIF Portal</p>
           <p className="sub-text">
